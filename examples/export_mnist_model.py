@@ -2,6 +2,20 @@
 
 """
 Export trained MNIST model to a .pb file.
+
+The core idea in this snippet:
+  1. A saver will be configured while training the model, which will 
+  save the model at some checkpoints.
+  2. There will be a meta file stored in the checkpoint directory that
+  the saver creates, which will be used to restore the state of the 
+  last saved checkpoint.
+  3. The model graph can be saved without reloading - just create the 
+  graph definition by using:
+
+    output_graph_def = graph_util.convert_variables_to_constants(
+        sess, input_graph_def, ['logits'])
+    with gfile.GFile(model_dir + '/model.pb', 'wb') as f:
+      f.write(output_graph_def.SerializeToString())
 """
 
 import os
@@ -95,7 +109,6 @@ def load_and_freeze_graph(model_dir):
         sess, input_graph_def, ['logits'])
     with gfile.GFile(model_dir + '/model.pb', 'wb') as f:
       f.write(output_graph_def.SerializeToString())
-
 
 def main(_):
   if not os.path.isdir(FLAGS.model_dir):
