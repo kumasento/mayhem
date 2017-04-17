@@ -13,8 +13,12 @@ class LeNetModel:
     This LeNet model uses the well-known structure: two convolution layers and two
     fully-connected layers
     """
-    @staticmethod
-    def inference(x):
+    
+    def __init__(self):
+        self.input_variable_name = 'x'
+        self.label_variable_name = 'y'
+
+    def inference(self, x):
         with tf.name_scope('inference'):
             with tf.name_scope('conv1'):
                 W_conv1 = tf.Variable(
@@ -91,8 +95,7 @@ class LeNetModel:
 
         return logits
 
-    @staticmethod
-    def loss(logits, labels):
+    def loss(self, logits, labels):
         with tf.name_scope('loss'):
             labels = tf.to_int64(labels, name='labels')
 
@@ -107,9 +110,7 @@ class LeNetModel:
 
         return loss 
 
-
-    @staticmethod
-    def train(loss, learning_rate):
+    def train(self, loss, learning_rate):
         with tf.name_scope('train'):
             # Will be used in TensorBoard
             tf.summary.scalar('loss', loss)
@@ -122,9 +123,7 @@ class LeNetModel:
 
         return train_op
 
-
-    @staticmethod
-    def evaluation(logits, labels):
+    def evaluation(self, logits, labels):
         with tf.name_scope('evaluation'):
             correct = tf.nn.in_top_k(logits, labels, 1)
 
@@ -133,33 +132,18 @@ class LeNetModel:
                     name='total_correct')
 
         return total_correct
-            
 
+    def build(self, graph):
+        batch_size = 50
+        learning_rate = 0.01
 
-def main(_):
-    graph = tf.Graph()
+        with graph.as_default():
+            # build several useful operators
+            self.input_placeholder = tf.placeholder(tf.float32, [None, IMAGE_PIXELS], name=self.input_variable_name)
+            self.label_placeholder = tf.placeholder(tf.int32, [None], name=self.label_variable_name)
+            logits                 = self.inference(self.input_placeholder)
+            loss                   = self.loss(logits, self.label_placeholder)
+            train_op               = self.train(loss, learning_rate)
+            evaluation             = self.evaluation(logits, self.label_placeholder)
 
-    batch_size = 50
-    learning_rate = 0.01
-
-    with graph.as_default():
-        x = tf.placeholder(tf.float32, [batch_size, 784])
-
-        y_ = tf.placeholder(tf.int32, [batch_size])
-
-        logits = LeNetModel.inference(x)
-
-        loss = LeNetModel.loss(logits, y_)
-
-        train_op = LeNetModel.train(loss, learning_rate)
-
-        evaluation = LeNetModel.evaluation(logits, y_)
-
-        graph_def = graph.as_graph_def()
-        for node in graph_def.node:
-            print(node.name)
-
-
-if __name__ == '__main__':
-
-    tf.app.run()
+        return logits, loss, train_op, evaluation
