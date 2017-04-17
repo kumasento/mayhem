@@ -1,150 +1,129 @@
 #!/usr/bin/env python
 """
-This file provides the definition of the LeNet model.
+This file provides the definition of the LeNet model, based on the TF layers API.
 """
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import numpy as np
 import tensorflow as tf
 
+from tensorflow.contrib import learn
+from tensorflow.contrib.learn.python.learn.estimators import model_fn as model_fn_lib
+
+tf.logging.set_verbosity(tf.logging.INFO)
+
 IMAGE_SIZE = 28
-IMAGE_PIXELS = IMAGE_SIZE * IMAGE_SIZE
+NUM_CHANNELS = 1
 
-class LeNetModel:
-    """
-    This LeNet model uses the well-known structure: two convolution layers and two
-    fully-connected layers
-    """
+def lenet_model_fn(features, labels, mode):
+    # input layer
+    input_layer = tf.reshape(features, [-1, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS])
     
-    def __init__(self):
-        self.input_variable_name = 'x'
-        self.label_variable_name = 'y'
-        self.name = 'LENET'
+    conv1 = tf.layers.conv2d(
+            inputs      = input_layer,
+            filters     = 32,
+            kernel_size = [5, 5],
+            padding     = 'same',
+            activation  = tf.nn.relu)
 
-    def inference(self, x):
-        with tf.name_scope('inference'):
-            with tf.name_scope('conv1'):
-                W_conv1 = tf.Variable(
-                        tf.truncated_normal([5, 5, 1, 32], stddev=0.1),
-                        name='weights')
+    pool1 = tf.layers.max_pooling2d(
+            inputs    = conv1,
+            pool_size = [2, 2],
+            strides   = 2)
 
-                b_conv1 = tf.Variable(
-                        tf.constant(0.1, shape=[32]),
-                        name='bias')
+    conv2 = tf.layers.conv2d(
+            inputs      = pool1,
+            filters     = 64,
+            kernel_size = [5, 5],
+            padding     = 'same',
+            activation  = tf.nn.relu)
 
-                h_conv1 = tf.nn.relu(
-                        tf.nn.conv2d(
-                            tf.reshape(x, [-1, 28, 28, 1]),
-                            W_conv1,
-                            strides=[1, 1, 1, 1],
-                            padding='SAME') + b_conv1)
+    pool2 = tf.layers.max_pooling2d(
+            inputs    = conv2,
+            pool_size = [2, 2],
+            strides   = 2)
 
-            with tf.name_scope('pool1'):
-                h_pool1 = tf.nn.max_pool(
-                        h_conv1,
-                        ksize=[1, 2, 2, 1],
-                        strides=[1, 2, 2, 1],
-                        padding='SAME')
+    pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
 
-            with tf.name_scope('conv2'):
-                W_conv2 = tf.Variable(
-                        tf.truncated_normal([5, 5, 32, 64], stddev=0.1),
-                        name='weights')
+    dense = tf.layers.dense(
+            inputs     = pool2_flat,
+            units      = 1024,
+            activation = tf.nn.relu)
 
-                b_conv2 = tf.Variable(
-                        tf.constant(0.1, shape=[64]),
-                        name='bias')
+    dropout = tf.layers.dropout(
+            inputs   = dense,
+            rate     = 0.4,
+            training = (mode == learn.ModeKeys.TRAIN))
 
-                h_conv2 = tf.nn.relu(
-                        tf.nn.conv2d(
-                            h_pool1,
-                            W_conv2,
-                            strides=[1, 1, 1, 1],
-                            padding='SAME') + b_conv2)
+    logits = tf.layers.dense(inputs=dropout, units=10)
 
-            with tf.name_scope('pool2'):
-                h_pool2 = tf.nn.max_pool(
-                        h_conv2,
-                        ksize=[1, 2, 2, 1],
-                        strides=[1, 2, 2, 1],
-                        padding='SAME')
+    loss = None
+    train_op = None
 
-            with tf.name_scope('fc1'):
-                W_fc1 = tf.Variable(
-                        tf.truncated_normal([7 * 7 * 64, 1024], stddev=0.1),
-                        name='weights')
+    if mode != learn.ModeKeys.INFER:
+        onehot_labels = tf.one_hot(
+                indices = tf.cast(labels, tf.int32),
+                depth   = 10)
 
-                b_fc1 = tf.Variable(
-                        tf.constant(0.1, shape=[1024]),
-                        name='bias')
+        loss = tf.losses.softmax_cross_entropy(
+                onehot_labels = onehot_labels,
+                logits        = logits)
 
-                h_fc1 = tf.nn.relu(
-                        tf.matmul(
-                            tf.reshape(h_pool2, [-1, 7 * 7 * 64]),
-                            W_fc1) + b_fc1)
+    if mode == learn.ModeKeys.TRAIN:
+        train_op = tf.contrib.layers.optimize_loss(
+                loss          = loss,
+                global_step   = tf.contrib.framework.get_global_step(),
+                learning_rate = 0.001,
+                optimizer     = 'SGD')
 
-            with tf.name_scope('fc2'):
-                W_fc2 = tf.Variable(
-                        tf.truncated_normal([1024, 10], stddev=0.1),
-                        name='weights')
+    predictions = {
+        "classes": tf.argmax(input=logits, axis=1),
+        "probabilities": tf.nn.softmax(
+            logits, name="softmax_tensor")
+    }
 
-                b_fc2 = tf.Variable(
-                        tf.constant(0.1, shape=[10]),
-                        name='bias')
+    return model_fn_lib.ModelFnOps(
+            mode        = mode,
+            predictions = predictions,
+            loss        = loss,
+            train_op    = train_op)
 
-                h_fc2 = tf.matmul(h_fc1, W_fc2) + b_fc2
+def main(_):
+    mnist        = learn.datasets.load_dataset('mnist')
+    train_data   = mnist.train.images
+    train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
+    eval_data    = mnist.test.images
+    eval_labels  = np.asarray(mnist.test.labels, dtype=np.int32)
 
-            logits = tf.identity(h_fc2, name='logits')
+    mnist_classifier = learn.Estimator(
+            model_fn = lenet_model_fn,
+            model_dir = '/tmp/lenet_model')
 
-        return logits
+    tensors_to_log = {} #{"probabilities": "softmax_tensor"}
+    logging_hook = tf.train.LoggingTensorHook(
+            tensors      = tensors_to_log,
+            every_n_iter = 50)
 
-    def loss(self, logits, labels):
-        with tf.name_scope('loss'):
-            labels = tf.to_int64(labels, name='labels')
+    mnist_classifier.fit(
+            x          = train_data,
+            y          = train_labels,
+            batch_size = 50,
+            steps      = 20000,
+            monitors   = [logging_hook])
 
-            cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                    labels=labels,
-                    logits=logits,
-                    name='cross_entropy')
+    metrics = {
+        "accuracy": learn.metric_spec.MetricSpec(
+            metric_fn      = tf.metrics.accuracy,
+            prediction_key = "classes"),
+    }
+    eval_results = mnist_classifier.evaluate(
+            x       = eval_data,
+            y       = eval_labels,
+            metrics = metrics)
+    print(eval_results)
 
-            cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy_mean')
-
-            loss = tf.identity(cross_entropy_mean, name='loss')
-
-        return loss 
-
-    def train(self, loss, learning_rate):
-        with tf.name_scope('train'):
-            # Will be used in TensorBoard
-            tf.summary.scalar('loss', loss)
-
-            optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-
-            global_step = tf.Variable(0, name='global_step', trainable=False)
-
-            train_op = optimizer.minimize(loss, global_step=global_step)
-
-        return train_op
-
-    def evaluation(self, logits, labels):
-        with tf.name_scope('evaluation'):
-            correct = tf.nn.in_top_k(logits, labels, 1)
-
-            total_correct = tf.reduce_sum(
-                    tf.cast(correct, tf.int32),
-                    name='total_correct')
-
-        return total_correct
-
-    def build(self, graph):
-        batch_size = 50
-        learning_rate = 0.01
-
-        with graph.as_default():
-            # build several useful operators
-            self.input_placeholder = tf.placeholder(tf.float32, [None, IMAGE_PIXELS], name=self.input_variable_name)
-            self.label_placeholder = tf.placeholder(tf.int32, [None], name=self.label_variable_name)
-            logits                 = self.inference(self.input_placeholder)
-            loss                   = self.loss(logits, self.label_placeholder)
-            train_op               = self.train(loss, learning_rate)
-            evaluation             = self.evaluation(logits, self.label_placeholder)
-
-        return logits, loss, train_op, evaluation
+if __name__ == '__main__':
+    tf.app.run()

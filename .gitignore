@@ -91,3 +91,5 @@ ENV/
 # Project specific
 # The configuration file will not be committed, but there will be an example
 config.yaml
+
+*-data

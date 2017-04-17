@@ -1,5 +1,9 @@
 # Models
 
+All the models are implemented under the TensorFlow layers API.
+
+## DEPRECATED
+
 Example models that will be used for testing in the Mayhem project. Every model
 file defined in this directory should:
 
