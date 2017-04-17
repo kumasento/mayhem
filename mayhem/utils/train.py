@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
+## @package 
+
 import tensorflow as tf
 
 class Trainer(object):
-    def __init__(self, model, dataset, logdir):
+    def __init__(self, model, dataset, logdir='/tmp'):
         self._model = model
         self._dataset = dataset
         self._logdir = logdir
