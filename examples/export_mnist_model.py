@@ -27,8 +27,7 @@ from tensorflow.python.platform import flags as flags_lib
 from tensorflow.python.platform import gfile
 from tensorflow.python.framework import graph_util
 
-sys.path.append(os.path.join(os.getcwd(), '..'))
-from mayhem.utils.train import Trainer
+from mayhem.utils.trainer import Trainer
 from mayhem.models.lenet_model import LeNetModel
 
 flags = flags_lib
@@ -38,7 +37,7 @@ flags.DEFINE_string("logdir", "/tmp", """Where to put the log directory""")
 flags.DEFINE_boolean("train", False, """Whether to retrain the model""")
 
 def train_and_save_model(logdir):
-    mnist = input_data.read_data_sets('MNIST_data')
+    mnist = input_data.read_data_sets('/tmp/MNIST_data')
     model = LeNetModel()
     trainer = Trainer(model, mnist, logdir)
     trainer.train()

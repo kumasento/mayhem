@@ -17,6 +17,7 @@ class LeNetModel:
     def __init__(self):
         self.input_variable_name = 'x'
         self.label_variable_name = 'y'
+        self.name = 'LENET'
 
     def inference(self, x):
         with tf.name_scope('inference'):

@@ -9,7 +9,8 @@ setup(name='mayhem',
       license='MIT',
       packages=['mayhem'],
       install_requires=[
-          'numpy'
+          'numpy',
+          'tensorflow-gpu'
       ],
       test_suite='nose.collector',
       tests_require=['nose'],
